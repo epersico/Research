@@ -29,9 +29,9 @@ def orbit(initialConditions,orbitLength):
 def pyplot(orbitarray):
 	print('Beginning plots...')
 	for i in range(len(orbitarray[0,0,:])):
-		plt.scatter(orbitarray[0,:,i],orbitarray[1,:,i],c=orbitarray[1,:,0])
+		plt.scatter(orbitarray[0,:,i],orbitarray[1,:,i],c=orbitarray[1,:,0],rasterized=True)
 	print('Plots are done.  Now showing...')
-	plt.show()
+	#plt.show()
 	print('Plot is shown! Yay!')
 	return
 
