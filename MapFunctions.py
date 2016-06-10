@@ -26,7 +26,7 @@ def orbit(initialConditions,orbitLength):
 	print('orbits calculated.')
 	return orbit
 
-def plot(orbitarray):
+def pyplot(orbitarray):
 	print('Beginning plots...')
 	for i in range(len(orbitarray[0,0,:])):
 		plt.scatter(orbitarray[0,:,i],orbitarray[1,:,i],c=orbitarray[1,:,0])
@@ -39,7 +39,7 @@ def main():
 
 	args = sys.argv[1:]
 	if not args:
-		print('usage: --k kvalue --orbitLength orbitlength')
+		print('usage: --k kvalue --orbitLength orbitlength --plot')
 
 	##Defining the k value
 	global k 
@@ -64,7 +64,9 @@ def main():
 	print('Initial conditions set.')
 
 	orbitarray = orbit(init,orbitLength)
-	plot(orbitarray)
+
+	if '--plot' in args:
+		pyplot(orbitarray)
 
 	
 	
