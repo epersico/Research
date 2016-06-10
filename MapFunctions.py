@@ -6,7 +6,7 @@ import scipy
 
 def standardMap(z):
 ##	if len(z) > 2:
-	z[1,:] = (z[1,:] - k * np.sin(2*scipy.pi*z[0,:]))%1
+	z[1,:] = (z[1,:] - k/(2*scipy.pi)* np.sin(2*scipy.pi*z[0,:]))%1
 	z[0,:] = (z[0,:] + z[1,:])%1
 	
 ##	z[:,1] = z[:,1] + k * np.sin(z[:,1])
@@ -20,22 +20,54 @@ def orbit(initialConditions,orbitLength):
 	orbit = np.zeros((2,initCondLength,orbitLength),dtype='float64')
 	orbit[:,:,0]=initialConditions.T
 	print(orbit[:,:,0].shape)
+	print('Calculating orbits....')
 	for i in range(orbitLength-1):
 		orbit[:,:,i+1]=standardMap(orbit[:,:,i])
+	print('orbits calculated.')
 	return orbit
 
-def main():
-	global k 
-	k = .87
-	init = np.random.rand(1000,2)
-	##init = np.array([[0,.5],[0,.5],[0,.5]])
-
-	orbitLength=10000
-	orbitarray = orbit(init,orbitLength)
-	for i in range(orbitLength):
-		plt.scatter(orbitarray[0,:,i],orbitarray[1,:,i],c=orbitarray[1,:,0],s=.1)
+def plot(orbitarray):
+	print('Beginning plots...')
+	for i in range(len(orbitarray[0,0,:])):
+		plt.scatter(orbitarray[0,:,i],orbitarray[1,:,i],c=orbitarray[1,:,0])
+	print('Plots are done.  Now showing...')
 	plt.show()
+	print('Plot is shown! Yay!')
+	return
 
+def main():
+
+	args = sys.argv[1:]
+	if not args:
+		print('usage: --k kvalue --orbitLength orbitlength')
+
+	##Defining the k value
+	global k 
+	if '--k' in args:
+		index = args.index('--k')
+		del args[index]
+		k = args.pop(index)
+		k= float(k)
+	else:
+		k = 0
+	print('k=',k)
+
+	if '--orbitLength' in args:
+		index = args.index('--orbitLength')
+		del args[index]
+		orbitLength=int(args[index])
+	else:
+		orbitLength=100
+	print('Orbit Length is:',orbitLength)
+
+	init = np.random.rand(100,2)
+	print('Initial conditions set.')
+
+	orbitarray = orbit(init,orbitLength)
+	plot(orbitarray)
+
+	
+	
 
 if __name__ == '__main__':
 	cProfile.run('main()')
