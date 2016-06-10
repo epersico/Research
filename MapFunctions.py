@@ -3,6 +3,7 @@ import numpy as np
 import cProfile
 import matplotlib.pyplot as plt
 import scipy
+import pyqtgraph as pg
 
 def standardMap(z):
 ##	if len(z) > 2:
@@ -28,13 +29,25 @@ def orbit(initialConditions,orbitLength):
 
 def pyplot(orbitarray):
 	print('Beginning plots...')
+	colors = abs(1-2*orbitarray[1,:,0])
 	for i in range(len(orbitarray[0,0,:])):
-		plt.scatter(orbitarray[0,:,i],orbitarray[1,:,i],c=orbitarray[1,:,0])
+		plt.scatter(orbitarray[0,:,i],orbitarray[1,:,i],c=colors,s=1,rasterized=True)
+		print('plotting orbit',i,'of',len(orbitarray[0,0,:]))
 	print('Plots are done.  Now showing...')
 	plt.show()
 	print('Plot is shown! Yay!')
 	return
 
+def pyqtPlot(orbitarray):
+	print('Beginning plots...')
+	plotwidget = pg.plot(title='Standard Map test plot')
+	for i in range(len(orbitarray[0,:,0])):
+		plotwidget.plot(orbitarray[0,i,:],orbitarray[1,i,:],pen=None,symbol='o',size=.01)
+		print('plotting orbit',i,'of',len(orbitarray[0,:,0]))
+	print('Plots are done.  Now showing...')
+	print('Plot is shown! Yay!')
+	input()
+	return
 def main():
 
 	args = sys.argv[1:]
@@ -66,11 +79,12 @@ def main():
 	orbitarray = orbit(init,orbitLength)
 
 	if '--plot' in args:
-		pyplot(orbitarray)
+	#	pyplot(orbitarray)
+		pyqtPlot(orbitarray)
 
 	
 	
 
 if __name__ == '__main__':
-	cProfile.run('main()')
-##	main()
+#	cProfile.run('main()')
+	main()
