@@ -103,8 +103,8 @@ def pyplot(orbitarray):
 	colors = abs(1-2*orbitarray[0,1,:])
 	print(colors.shape)
 	for i in range(len(orbitarray[:,0,0])):
-		plt.scatter(orbitarray[i,0,:],orbitarray[i,1,:],s=1,c=colors,rasterized=True)
-		print('plotting orbit',i,'of',len(orbitarray[:,0,0]))
+		plt.scatter(orbitarray[i,0,:],orbitarray[i,1,:],marker='o',lw=0.0,s=1,c=colors,rasterized=True)
+		print('plotting orbit',i+1,'of',len(orbitarray[:,0,0]))
 	print('Plots are done.  Now saving...')
 	plt.ylim([0,1])
 	plt.xlim([0,1])
@@ -137,8 +137,8 @@ def main():
 		print(init)
 
 		print('making root function')
-		function = rootFunction(5)
-		x = np.random.rand(10000,2)
+		function = rootFunction(25)
+		x = np.random.rand(10000000,2)
 		x[:,0]=0
 
 		y0s = ycoord(x)
@@ -163,7 +163,6 @@ def main():
 		k = 0
 	print('k=',k)
 
-
 	if '--orbitLength' in args:
 		index = args.index('--orbitLength')
 		del args[index]
@@ -172,7 +171,7 @@ def main():
 		orbitLength=100
 	print('Orbit Length is:',orbitLength)
 
-	init = np.random.rand(100,2)
+	init = np.random.rand(200,2)
 	print('Initial conditions set.')
 
 
