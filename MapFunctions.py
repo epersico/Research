@@ -101,7 +101,6 @@ def compose(functions):
 
 def residue(m1,m2):
 	r = m1/m2
-	r=.58
 	endpoint = xcoord(singleOrbitPoint(m2,np.array([[0,0]])))[0]
 	counter = 0
 	func = rootFunction(m2)
