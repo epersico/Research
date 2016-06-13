@@ -2,7 +2,7 @@ import sys
 import numpy as np
 import cProfile
 import matplotlib.pyplot as plt
-import scipy
+import scipy.optimize
 import pyqtgraph as pg
 import functools
 
@@ -27,13 +27,8 @@ def standardMap(z):
 	This will work with only one point as well, however,
 	currently it must still be a numpy array.
 	"""
-	if len(z) >= 1:
-		z[:,1] = (z[:,1] - k/(2*scipy.pi)* np.sin(2*scipy.pi*z[:,0]))
-		z[:,0] = (z[:,0] + z[:,1])
-	
-	else:
-		z[1] = (z[1] - k/(2*scipy.pi)* np.sin(2*scipy.pi*z[0,:]))
-		z[0] = (z[0] + z[1])%1
+	z[:,1] = (z[:,1] - k/(2*np.pi)* np.sin(2*np.pi*z[:,0]))
+	z[:,0] = (z[:,0] + z[:,1])
 	return z
 
 def orbit(initialConditions,orbitLength):
@@ -53,6 +48,11 @@ def orbit(initialConditions,orbitLength):
 	print('orbits calculated.')
 	return orbit
 
+def singleOrbitPoint(n,z):
+	tupleofSMs = (standardMap for i in range(n))
+	SMcomposition = compose(tupleofSMs)
+	return SMcomposition(z)
+
 def reduceOrbit(orbitLength):
 	"""
 	takes orbitLength and returns the appropraite m/2 or (m+1)/2
@@ -66,19 +66,20 @@ def reduceOrbit(orbitLength):
 	return int(m)
 
 def xcoord(z):
-	return z[:,0]%1
+	return z[:,0]
 def ycoord(z):
-	return z[:,1]%1
+	return z[:,1]
 
 def evenRootFunction(z):
 	x = xcoord(z)
 	y = ycoord(z)
-	return np.sin(2*scipy.pi*x)
+	return np.sin(2*np.pi*x)
 
 def oddRootFunction(z):
 	x = xcoord(z)
 	y = ycoord(z)
-	return np.sin(2*scipy.pi*(x - .5*(y-1)))
+	return np.sin(2*np.pi*(x - .5*(y-1)))
+
 def rootFunction(orbitLength):
 	"""
 	Takes orbit length and returns the proper number of compositions
@@ -86,21 +87,49 @@ def rootFunction(orbitLength):
 	"""
 	m = reduceOrbit(orbitLength)
 	tupleofSMs = (standardMap for i in range(m))
-	print(tupleofSMs)
 	SMcomposition = compose(tupleofSMs)
 	if orbitLength%2:
-		func = compose((oddRootFunction,SMcomposition))
+		func = compose((oddRootFunction,SMcomposition,zeroY))
 	else:
-		func = compose((evenRootFunction,SMcomposition))
+		func = compose((evenRootFunction,SMcomposition,zeroY))
 	return func
+def zeroY(y):
+	return np.array([[0,y]])
 
 def compose(functions):
 	return functools.reduce(lambda f,g: lambda x: f(g(x)),functions, lambda x: x)
 
+def residue(m1,m2):
+	r = m1/m2
+	r=.58
+	endpoint = xcoord(singleOrbitPoint(m2,np.array([[0,0]])))[0]
+	counter = 0
+	func = rootFunction(m2)
+	while abs(endpoint-m1) >= .001:
+		if counter > 0:
+			r =(r+.0001)%1
+		counter += 1
+		try:
+			#root = scipy.optimize.brentq(func,0+r,1)
+			root = scipy.optimize.newton(func,r)
+			orbitpoint = singleOrbitPoint(m2,np.array([[0,root]]))
+			endpoint = xcoord(orbitpoint)[0]
+		except RuntimeError:
+			print('oops the values got away from us')
+
+	print('Went through',counter,'iterations to find correct root')
+	print('for winding number',m1/m2)
+	print('Final root was',root)
+	print('final point on orbit was',orbitpoint)
+	return
+
+
+
 def pyplot(orbitarray):
 	print('Beginning plots...')
 	orbitarray = orbitarray%1
-	colors = abs(1-2*orbitarray[0,1,:])
+	#colors = abs(1-2*orbitarray[0,1,:])
+	colors = orbitarray[0,1,:]
 	print(colors.shape)
 	for i in range(len(orbitarray[:,0,0])):
 		plt.scatter(orbitarray[i,0,:],orbitarray[i,1,:],marker='o',lw=0.0,s=1,c=colors,rasterized=True)
@@ -112,16 +141,6 @@ def pyplot(orbitarray):
 	print('Plot is saved! Yay!')
 	return
 
-def pyqtPlot(orbitarray):
-	print('Beginning plots...')
-	plotwidget = pg.plot(title='Standard Map test plot')
-	for i in range(len(orbitarray[:,0,0])):
-		plotwidget.plot(orbitarray[i,0,:],orbitarray[i,1,:],pen=None,symbol='o',size=.01)
-		print('plotting orbit',i,'of',len(orbitarray[:,0,0]))
-	print('Plots are done.  Now saving...')
-	print('Plot is saved! Yay!')
-	input()
-	return
 
 
 def main():
@@ -132,23 +151,6 @@ def main():
 
 	##Test section of code here.  
 	if '--test' in args:
-		setk(.87)
-		init = np.array([[.1,.2],[.3,.4],[.5,.6]])
-		print(init)
-
-		print('making root function')
-		function = rootFunction(25)
-		x = np.random.rand(10000000,2)
-		x[:,0]=0
-
-		y0s = ycoord(x)
-		y = function(x)
-
-		print(y0s.shape)
-		print(y.shape)
-		print('plotting')
-		plt.scatter(y0s,y)
-		plt.show()
 		sys.exit()
 
 
@@ -162,6 +164,14 @@ def main():
 	else:
 		k = 0
 	print('k=',k)
+
+	if '--residue' in args:
+		index = args.index('--residue')
+		del args[index]
+		m1 = int(args.pop(index))
+		m2 = int(args.pop(index))
+		print('Finding residue for winding number:',m1,'/',m2)
+		residue(m1,m2)
 
 	if '--orbitLength' in args:
 		index = args.index('--orbitLength')
@@ -183,6 +193,17 @@ def main():
 
 	
 	
+def pyqtPlot(orbitarray):
+	print('Beginning plots...')
+	plotwidget = pg.plot(title='Standard Map test plot')
+	for i in range(len(orbitarray[:,0,0])):
+		plotwidget.plot(orbitarray[i,0,:],orbitarray[i,1,:],pen=None,symbol='o',size=.01)
+		print('plotting orbit',i,'of',len(orbitarray[:,0,0]))
+	print('Plots are done.  Now saving...')
+	print('Plot is saved! Yay!')
+	input()
+	return
+
 
 if __name__ == '__main__':
 #	cProfile.run('main()')
