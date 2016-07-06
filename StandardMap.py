@@ -18,7 +18,7 @@ def setk(kvalue):
 	print('k=',k)
 	return
 
-def standardMap(z):
+def Map(z):
 	"""
 	Takes in an array points and iterates them with the Standard Map.  
 	Must be numpy array. NOTE: This changes what is passed. 
