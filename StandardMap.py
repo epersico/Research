@@ -5,7 +5,12 @@ import matplotlib.pyplot as plt
 import scipy.optimize
 import pyqtgraph as pg
 import functools
-
+"""
+IMPORTANT: Conventions I changed in the SNTM file are as follows
+7/6/16: orbit iterates orbitLength times instead of orbitLength -1 
+		No longer use singleOrbitPoint, instead define iteratively a 
+			function to produce the single point.  
+"""
 def setk(kvalue):
 	"""
 	In order for the k value to be passed to the different functions
@@ -44,15 +49,15 @@ def orbit(initialConditions,orbitLength):
 	print('There are',initCondLength,'orbits of length', orbitLength)
 	for i in range(orbitLength-1):
 		orbit[:,:,i+1]=orbit[:,:,i]
-		standardMap(orbit[:,:,i+1])
+		Map(orbit[:,:,i+1])
 	print('orbits calculated.')
 	return orbit
 
 def singleOrbitPoint(n):
 	"""
-	Simply iterates the point z n times using the standardMap
+	Simply iterates the point z n times using the Map
 	"""
-	tupleofSMs = (standardMap for i in range(n))
+	tupleofSMs = (Map for i in range(n))
 	SMcomposition = compose(tupleofSMs)
 	return SMcomposition
 
@@ -109,9 +114,9 @@ def rootFunction(orbitLength):
 	of the standard map into the even or odd root function.
 	"""
 	m = reduceOrbit(orbitLength)
-	tupleofSMs = (standardMap for i in range(m-1))
+	tupleofSMs = (Map for i in range(m-1))
 	#SMcomposition = compose(tupleofSMs)
-	SMcomposition = standardMap
+	SMcomposition = Map
 	for SM in tupleofSMs:
 		SMcomposition = compose((SMcomposition,SM))
 
@@ -155,7 +160,7 @@ def residue(m1,m2):
 	counter = 0
 	stepCounter =0
 	stepsize = .1
-	func = rootFunction(m2)
+	func = rootFunction(m2)		
 	orbitpoint = singleOrbitPoint(m2)
 	while abs(endpoint-m1) >= 1e-6:
 		if counter > 0:
