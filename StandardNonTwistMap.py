@@ -143,6 +143,11 @@ def orbitSingle(initialConditions, orbitLength):
 	print('Orbits calculated.')
 	return orbit
 
+def Mapn(z,n):
+	for i in range(n):
+		MapSinglePoint(z)
+	return
+
 def nIterationFunc(n):
 	"""
 	Returns a function which is the composition of n copies
@@ -161,17 +166,43 @@ def windingNumber(y):
 	"""
 	Winding Number function goes here
 	"""
-	n = 100000
-	initconds = np.array([[0,y]])
-	orbitarray = orbit(initconds,n)
-	'''
-	func = nIterationFunc(n)
-	func = compose((func,zeroY))
-	func = compose((xcoord,func))
-	'''
-	omega = orbitarray[0,0,-1]
-	omega = omega/n
-	return omega
+	nMax = int(2.9e5)
+	epsilon = 1e-6
+
+	z = [0,y]
+	orbitarray = np.array([[z[0,0],z[0,1]]])
+	omega1 = 0
+	
+	for i in range(nMax):
+		Map(z)
+		orbitarray = np.append(orbitarray,z,axis=0)
+		omega2=omega1
+		omega1 = orbitarray[-1,0]/(i+1)
+		#omega2 = orbitarray[-2,0]/(i+1)
+		if abs(omega2-omega1) <= epsilon:
+			print('winding number converged after',i,'iterations')
+			break
+		if i > nMax:
+			print('winding number failed to converge')
+			omega1=.6025
+	return omega1
+
+	
+
+
+
+	"""
+	n = 1000
+	z = [0,y]
+	for i in range(n):
+		MapSinglePoint(z)
+		if z[0]%1 == 0 and z[1]==y:
+			n=i+1
+			print('This was a periodic orbit of order:',i+1)
+			break 
+	return z[0]/n
+	"""
+
 	
 
 def main():
@@ -179,7 +210,7 @@ def main():
 	if not args:
 		print('usage description to come later!')
 
-	if '--test1' in args:
+	if '--windingnumbertest' in args:
 		print('Running only the test section of code!')
 
 		output_file("test.html", title="test")
@@ -187,19 +218,27 @@ def main():
 		seta(.615)
 		setb(.4)
 		
-		ys = np.random.rand(1000)-.5
-		omegas = np.random.rand(1000)
-		for i in range(len(omegas)):
-			omegas[i] = windingNumber(ys[i])
+		ys = np.linspace(-.3,.2,100)
 
-		p = figure(title = 'winding number test')
+		print('starting calculation of winding numbers')
+		omegas = [windingNumber(y) for y in ys]
+		print('finished with that! Now to plot!')
+
+		p = figure(title = 'winding number test',x_range=(-.3,.2),y_range=(.57,.605))
 		p.circle(ys,omegas)
 		show(p)
 
 
 		sys.exit()
 
-	if '--test2' in args:
+	"""
+	Below is the code where I was working on datashader stuff.  Where I left it it
+	it was saving the image very quickly.  However, I was not getting the zooming 
+	functionality of InteractiveImage.  This is because InteractiveImage is set up 
+	to work in a jupyter notebook and not in bokeh server mode.  There were promising 
+	things I found on google that might resolve this.  
+	"""
+	if '--dstest' in args:
 
 		seta(.615)
 		setb(.4)
