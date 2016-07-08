@@ -3,9 +3,14 @@ import numpy as np
 import cProfile
 import matplotlib.pyplot as plt
 import scipy.optimize
-import pyqtgraph as pg
+#import pyqtgraph as pg
 import functools
-from bokeh.plotting import figure, show, output_file, output_server
+from bokeh.plotting import figure, show, output_file, output_server, curdoc
+import bokeh
+import datashader as ds
+from datashader import transfer_functions as tf
+import pandas as pd
+from datashader.bokeh_ext import InteractiveImage
 
 """
 These are initialization functions.
@@ -108,6 +113,31 @@ def orbit(initialConditions, orbitLength):
 	print('Calculating orbits using SNTM....')
 	print('There are',initCondLength,'orbits of length', orbitLength)
 	for i in range(orbitLength):
+		if i%1000 == 0:
+			print('finished with:',i)
+		orbit[:,:,i+1]=orbit[:,:,i]
+		Map(orbit[:,:,i+1])
+	print('Orbits calculated.')
+	return orbit
+
+def orbitSingle(initialConditions, orbitLength):
+	"""
+	Takes array of shape (n,2) of n initial conditions and returns an
+	array of shape (n,2,orbitLength) such that the orbit goes from 0 
+	to orbitLength.  This means if it is a periodic orbit of length equal
+	to the orbitLength the first and last entry should be the same
+
+	NOTE: For index purposes: 
+	The first index corresponds to the index of the initial condition.  
+	The second index chooses x or y 
+	The third index is the position on the orbit
+	"""
+	initCondLength= len(initialConditions[:,0])
+	orbit = np.zeros((initCondLength,2,orbitLength+1),dtype='float64')
+	orbit[:,:,0]=initialConditions
+	print('Calculating orbits using SNTM....')
+	print('There are',initCondLength,'orbits of length', orbitLength)
+	for i in range(orbitLength):
 		orbit[:,:,i+1]=orbit[:,:,i]
 		Map(orbit[:,:,i+1])
 	print('Orbits calculated.')
@@ -149,7 +179,7 @@ def main():
 	if not args:
 		print('usage description to come later!')
 
-	if '--test' in args:
+	if '--test1' in args:
 		print('Running only the test section of code!')
 
 		output_file("test.html", title="test")
@@ -169,12 +199,64 @@ def main():
 
 		sys.exit()
 
-	if '--orbitLength' in args:
-		index = args.index('orbitLength')
-		del args[index]
-		orbitLength = args.pop(index)
-		initconds = np.random.rand(200,2)-.5
-		orbitarray = orbit(initconds, orbitLength)
+	if '--test2' in args:
+
+		seta(.615)
+		setb(.4)
+
+		#output_file("datashadertest.html", title="DStest")
+		output_server('hover')
+
+
+		initconds = np.random.rand(5e2,2)-.5
+		orbitarray = orbit(initconds,int(1e4))
+
+		x_range, y_range = ((-.5,.5),(-.5,.5))
+
+		plot_width = int(750)
+		plot_height = plot_width//1.3
+
+		background = 'black'
+		export = functools.partial(ds.utils.export_image, export_path="export", background=background)
+
+		points = np.array([[],[]])
+		print('putting the orbits into arrays for plotting...')
+		for i in range(len(orbitarray[:,0,0])):
+			points = np.append(points,orbitarray[i,:,:],axis=1)
+		points[0,:]=points[0,:]%1-.5
+
+
+		df = pd.DataFrame(points.T,columns=['x','y'])
+		print('finished. Here are the last three rows:', df.tail(3))
+
+		def create_image(x_range,y_range,w=plot_width,h=plot_height):
+			canvas = ds.Canvas(plot_width=plot_width,plot_height=plot_height,
+			x_range=x_range, y_range=y_range)
+			agg = canvas.points(df,'x','y')
+			img = tf.interpolate(agg,cmap=ds.colors.Hot,how='log')
+			return tf.dynspread(img,threshold=0.5,max_px=4)
+
+		def base_plot(tools='pan,wheel_zoom,reset',plot_width=plot_width,plot_height=plot_height, **plot_args):
+			p = figure(tools=tools, plot_width=plot_width, plot_height=plot_height, x_range=x_range, y_range=y_range, outline_line_color=None,min_border=0, min_border_left=0, min_border_right=0,min_border_top=0, min_border_bottom=0, **plot_args)
+			p.axis.visible = True
+			p.xgrid.grid_line_color = None
+			p.ygrid.grid_line_color = None
+			return p
+
+		print('making the image now...')
+		session = bokeh.client.push_session(curdoc())
+
+		p = base_plot(background_fill_color=background)
+		export(create_image(x_range,y_range),'testexport')
+		print('image saved.')
+		
+		#curdoc().add_periodic_callback(create_image, 50)
+		session.show()
+		InteractiveImage(p,create_image,throttle=200)
+		session.loop_until_closed()
+
+	
+
 	
 	if '--a' in args:
 		index = args.index('--a')
@@ -189,6 +271,14 @@ def main():
 		b = args.pop(index)
 		setb(b)
 	
+	if '--orbitLength' in args:
+		index = args.index('--orbitLength')
+		del args[index]
+		orbitLength = args.pop(index)
+		orbitLength = int(orbitLength)
+		initconds = np.random.rand(200,2)
+		orbitarray = orbit(initconds, orbitLength)
+
 	if '--plot' in args:
 		if not orbitLength:
 			print('please specify orbit length using command line flag --orbitLength')
@@ -198,11 +288,12 @@ def main():
 		p = figure(title ='testplot!',x_range=(0,1),y_range=(-.5,.5),webgl=True)
 		for i in range(len(orbitarray[:,0,0])):
 			p.circle(orbitarray[i,0,:],orbitarray[i,1,:],size=.1)
-		print('showing plot')
+		print('showing plot...')
 		show(p)
 		print('plot should be showing')
 		
 	return
 
 if __name__ == '__main__':
+#	cProfile.run('main()')
 	main()
