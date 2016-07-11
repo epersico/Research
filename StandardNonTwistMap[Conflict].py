@@ -166,9 +166,9 @@ def windingNumber(y):
 	"""
 	Winding Number function goes here
 	"""
-	nMax = int(1e6)
-	epsilon = 5e-5
-	m=int(1e3)
+	nMax = int(2.9e6)
+	epsilon = 1e-3
+	m=int(1e1)
 	n=0
 	omegas = [0]
 
@@ -183,18 +183,16 @@ def windingNumber(y):
 		if abs(omegas[-1]-omegas[-2]) <= epsilon:
 			if n == 0:
 				n=i
-				
-			elif i>n+m:
-				print('Has been close to itself for',m,'iterations.')	
-				sup = max(omegas[:n])
+				sup = max(omegas[-n:])
 				inf = min(omegas[:n])
+			elif i>n+m:
 				if sup >= omega and inf <= omega:
-					print('/n-----/nconverged!/n----/n')
+					print('winding number converged!')
 					break
 		else:
 			n=0
 		if i == nMax-1:
-			print('failed to converge')
+			print('winding number failed to converge')
 			omega =.6025
 	return omega
 
@@ -226,17 +224,17 @@ def main():
 
 		output_file("test.html", title="test")
 
-		seta(.923)
-		setb(0.22325262)
+		seta(.615)
+		setb(.4)
 		
-		ys = np.linspace(-.3,.2,400)
+		ys = np.linspace(-.3,.2,100)
 
 		print('starting calculation of winding numbers')
 		omegas = [windingNumber(y) for y in ys]
 		print('finished with that! Now to plot!')
 
 		p = figure(title = 'winding number test',x_range=(-.3,.2),y_range=(.57,.605))
-		p.circle(ys,omegas)
+		p.line(ys,omegas)
 		show(p)
 
 
