@@ -7,10 +7,42 @@ import scipy.optimize
 import functools
 from bokeh.plotting import figure, show, output_file, output_server, curdoc
 import bokeh
+"""
 import datashader as ds
 from datashader import transfer_functions as tf
 import pandas as pd
 from datashader.bokeh_ext import InteractiveImage
+"""
+
+def xcoord(z):
+	"""
+	returns the x component of the orbit
+	"""
+	return z[0]
+
+def ycoord(z):
+	"""
+	returns the y component of the orbit
+	"""
+	return z[1]
+
+def zeroY(y):
+	"""
+	Used in function composition to plug in an array with zero intial x 
+	and arbitrary y.
+	"""
+	return np.array([[0,y]])
+
+def compose(functions):
+	"""
+	Defined recursively.  Provide a tuple of function names and this returns 
+	a function which is their composition. For more information look here:
+	https://mathieularose.com/function-composition-in-python/
+	"""
+	return functools.reduce(lambda f,g: lambda x: f(g(x)),functions, lambda x: x)
+
+def subtraction(a,b):
+	return a-b
 
 """
 These are initialization functions.
@@ -50,6 +82,15 @@ def Map(z):
 	z[:,0] = (z[:,0] + a*(1-z[:,1]**2))
 	return z
 
+def tangentMap(z):
+	x = z[0]
+	y = z[1]
+	return np.array([[1+4*a*b*np.pi*np.cos(2*np.pi*x)*(y-b*np.sin(2*np.pi*x)),-2*a*(y-b*np.sin(2*np.pi*x))],[-2*b*np.pi*np.cos(2*np.pi*x),1]])
+
+def R(z,n):
+	z[0] -= n
+	return z
+
 def MapSinglePoint(z):
 	"""
 	Takes in an array points and iterates them with the SNTM.  
@@ -64,32 +105,9 @@ def MapSinglePoint(z):
 	z[0] = (z[0] + a*(1-z[1]**2))
 	return z
 
-def xcoord(z):
-	"""
-	returns the x component of the orbit
-	"""
-	return z[:,0]
+def nonMonotoneCurvey(x):
+	return b*np.sin(2*np.pi*x)
 
-def ycoord(z):
-	"""
-	returns the y component of the orbit
-	"""
-	return z[:,1]
-
-def zeroY(y):
-	"""
-	Used in function composition to plug in an array with zero intial x 
-	and arbitrary y.
-	"""
-	return np.array([[0,y]])
-
-def compose(functions):
-	"""
-	Defined recursively.  Provide a tuple of function names and this returns 
-	a function which is their composition. For more information look here:
-	https://mathieularose.com/function-composition-in-python/
-	"""
-	return functools.reduce(lambda f,g: lambda x: f(g(x)),functions, lambda x: x)
 
 """
 Functions for computing and plotting large number of orbts.
@@ -156,19 +174,19 @@ def nIterationFunc(n):
 	compositions later.  This can also be used to calculate a single 
 	point along an orbit without storing all the information.  
 	"""
-	maptuple = (Map for i in range(n-1))
-	mapComp = Map
+	maptuple = (MapSinglePoint for i in range(n-1))
+	mapComp = MapSinglePoint
 	for SNTM in maptuple:
-		mapComp = compose((mapComp,SNTM))
+		mapComp = compose((mapComp,MapSinglePoint))
 	return mapComp
 
 def windingNumber(y):
 	"""
 	Winding Number function goes here
 	"""
-	nMax = int(1e6)
-	epsilon = 5e-5
-	m=int(1e3)
+	nMax = int(3e6)
+	epsilon = 1e-6
+	m=int(1e5)
 	n=0
 	omegas = [0]
 
@@ -189,7 +207,7 @@ def windingNumber(y):
 				sup = max(omegas[:n])
 				inf = min(omegas[:n])
 				if sup >= omega and inf <= omega:
-					print('/n-----/nconverged!/n----/n')
+					print('/n -----/n converged!/n ----/n ')
 					break
 		else:
 			n=0
@@ -198,28 +216,179 @@ def windingNumber(y):
 			omega =.6025
 	return omega
 
+
+
+"""
+Here is some code for the creation of the root function.  f2 in Fuchss dissertation.  
+See pg. 105 (pdf 120)
+"""
+def xsubi(i,y):
+	if i == 1:
+		return 0
+	elif i ==2:
+		return 1/2
+	elif i == 3:
+		return .5*a*(1-y**2)
+	elif i == 4:
+		return .5*a*(1-y**2)+1/2
+
+def mapSelectorFunction(j,m2):
+	if j == 0 or j== 3:
+		return .5*(m2+1)
+	else:
+		return .5*(m2-1)
+
+def xSelectorFunction(j,m1):
+	if j%2==1:
+		return .5*(m1+1)
+	else:
+		return .5*(m1-1)
+
+def totalSelectorFunction(i,m1,m2):
+	if m2%2 == 0:
+		j = (3-i)%4
+		Riteration = xSelectorFunction(j,m1)
+		mapIteration = m2/2
+	else:
+		if m1%2==1:
+			j = (5-i)%4
+			Riteration = xSelectorFunction(j,m1)
+		else: 
+			j = (i+2)%4
+			Riteration = m1/2
+		mapIteration = mapSelectorFunction(j,m2)
+	if j == 0: 
+		j=4
+	print('n,m before being turned into ints',Riteration,mapIteration)
+	return [int(j),int(Riteration),int(mapIteration)]
+
+
+
+
+def finalFunc(x):
+	return x/(1+abs(x))
+
+def rootFunction(i,m1,m2):
+	j, n, m  = totalSelectorFunction(i,m1,m2)
+	print('j,n,m:', j,n,m)
+	xofy = functools.partial(xsubi,i)
+	xofyFin = functools.partial(xsubi,j)
+	"""
+	The step that follows is very confusing.  functools.partial lets one specidfy some 
+	of the parameters.  In this case I use it on itself and specify subtraction.  
+	now func = partialFunc(y) = y - ? and the ? still remains to be specified
+	now func(x) = y - x.  I use this basic function combined with further compositions
+	to make the requisite root function.
+	"""
+	partialFunc = functools.partial(functools.partial,subtraction)
+
+	mapIterationsFunc = nIterationFunc(m)
+	RIterationsFunc = functools.partial(R,n=n)
 	
 
+	def zofy(y):
+		return[xofy(y),y]
+
+	zPrimeFunc = compose((RIterationsFunc,mapIterationsFunc,zofy))
+	xPrimeFunc = compose((xcoord,zPrimeFunc))
+	yPrimeFunc = compose((ycoord,zPrimeFunc))
+
+	def f2(y):
+		func = compose((partialFunc,xPrimeFunc))
+		func = func(y)
+		func = compose((func,xofyFin,yPrimeFunc))
+		return func(y)
+
+	func = compose((finalFunc,f2))
+	return func
 
 
+def residue(i,m1,m2,upordown):
+	
 	"""
-	n = 1000
-	z = [0,y]
-	for i in range(n):
-		MapSinglePoint(z)
-		if z[0]%1 == 0 and z[1]==y:
-			n=i+1
-			print('This was a periodic orbit of order:',i+1)
-			break 
-	return z[0]/n
+	This is the beginning of my residue function.  m1 and m2 define
+	the winding number of the orbit such that r = m1/m2.
 	"""
+
+	r = m1/m2
+	r = (1-r/a)**.5
+	if upordown == 1:
+		r=-1*r
+	endpoint = 0
+	counter = 0
+	stepCounter =0
+	stepsize = .001
+	root = 0
+	func = rootFunction(i,m1,m2)	
+	m2Function = nIterationFunc(m2)
+	xofy = functools.partial(xsubi,i)
+	while not root or abs(root)>.5:
+		try:
+			root = scipy.optimize.brentq(func,r-stepsize/2,r+stepsize/2,maxiter=200,xtol=1e-14,rtol=1e-14)
+			print('root is',root)
+			z=[xofy(root),root]
+			Mapn(z,m2)
+			endpoint = z[0]
+			print('endpoint is',endpoint)
+		except ValueError:
+			pass
+			#print('Values did not bracket roots')
+		stepCounter += 1
+		r=(r+stepsize)%1-.5
+		if stepCounter>1/stepsize:
+			stepsize=stepsize/10
+			stepCounter = 0
+			print('stepsize',stepsize)
+		if stepsize < 1e-6:
+			print('No root found')
+			sys.exit()
+	print('for winding number',m1/m2)
+	print('Final root was',root)
+	
 
 	
+	print('Calculating the rest of the orbit for residue calculation...')
+	orbitarray = orbit(np.array([[xofy(root),root]]),m2)
+	print('final point on orbit was',orbitarray[0,:,-1])
+	orbitarray[0,0,:] = orbitarray[0,0,:]%1 
+	print('the last point in the res calc is',orbitarray[0,:,m2-1])
+	tangentMatrix = np.array([[1,0],[0,1]])
+	for i in range(m2):
+		tangentMatrix = np.dot(tangentMap(orbitarray[0,:,i]),tangentMatrix)
+	trace = np.trace(tangentMatrix)
+	res = .25*(2-trace)
+	print('residue is:',res)
+	return res
 
 def main():
 	args = sys.argv[1:]
 	if not args:
 		print('usage description to come later!')
+
+	if '--rftest' in args:
+		output_file("test.html", title="test")
+
+		i = 3
+		m1 = 46368
+		m2 = 75025
+		ud = -1
+	
+		seta(0.686048)
+		setb(.742489259544)
+		
+		"""
+		func = rootFunction(i,m1,m2)
+		ys = np.linspace(-.6,.6,500)
+		fs = [func(y) for y in ys]
+		p = figure(title = 'winding number test',x_range=(-.6,.6),y_range=(-1,1))
+		p.circle(ys,fs)
+		show(p)
+		"""
+		residue(i,m1,m2,ud)
+
+		
+		
+		sys.exit()
 
 	if '--windingnumbertest' in args:
 		print('Running only the test section of code!')
@@ -227,7 +396,7 @@ def main():
 		output_file("test.html", title="test")
 
 		seta(.923)
-		setb(0.22325262)
+		setb(0.22465)
 		
 		ys = np.linspace(-.3,.2,400)
 
