@@ -164,7 +164,7 @@ def orbitSingle(initialConditions, orbitLength):
 def Mapn(z,n):
 	for i in range(n):
 		MapSinglePoint(z)
-	return
+	return z
 
 def nIterationFunc(n):
 	"""
@@ -262,73 +262,52 @@ def totalSelectorFunction(i,m1,m2):
 	print('n,m before being turned into ints',Riteration,mapIteration)
 	return [int(j),int(Riteration),int(mapIteration)]
 
-
-
-
 def finalFunc(x):
 	return x/(1+abs(x))
 
-def rootFunction(i,m1,m2):
-	j, n, m  = totalSelectorFunction(i,m1,m2)
-	print('j,n,m:', j,n,m)
+def rootFinding(i,q,p):
+	"""
+	For winding number q/p.  In p iterations this will go around the torus q times. 
+	"""
+	root =0
+	r = q/p
+	stepsize = .1
+	stepCounter = 0
+	endpoint = 0
+
+	j,n,m = totalSelectorFunction(i,q,p)
 	xofy = functools.partial(xsubi,i)
 	xofyFin = functools.partial(xsubi,j)
+
+	print('End Symmetry Line Number:', j,'\nq (numerator) is',q,'\np (denominator)',p)
+
+	def rootfunction(y):
+		z = [xofy(y),y]
+		Mapn(z,m)
+		xiPrime = z[0] - n 
+		yiPrime = z[1]
+		
+		xjPrime = xofyFin(yiPrime) 
+		return xiPrime - xjPrime
+
+	func = compose((finalFunc,rootfunction))
+
 	"""
-	The step that follows is very confusing.  functools.partial lets one specidfy some 
-	of the parameters.  In this case I use it on itself and specify subtraction.  
-	now func = partialFunc(y) = y - ? and the ? still remains to be specified
-	now func(x) = y - x.  I use this basic function combined with further compositions
-	to make the requisite root function.
-	"""
-	partialFunc = functools.partial(functools.partial,subtraction)
-
-	mapIterationsFunc = nIterationFunc(m)
-	RIterationsFunc = functools.partial(R,n=n)
-	
-
-	def zofy(y):
-		return[xofy(y),y]
-
-	zPrimeFunc = compose((RIterationsFunc,mapIterationsFunc,zofy))
-	xPrimeFunc = compose((xcoord,zPrimeFunc))
-	yPrimeFunc = compose((ycoord,zPrimeFunc))
-
-	def f2(y):
-		func = compose((partialFunc,xPrimeFunc))
-		func = func(y)
-		func = compose((func,xofyFin,yPrimeFunc))
-		return func(y)
-
-	func = compose((finalFunc,f2))
-	return func
-
-
-def residue(i,m1,m2,upordown):
-	
-	"""
-	This is the beginning of my residue function.  m1 and m2 define
-	the winding number of the orbit such that r = m1/m2.
+	ys = np.linspace(-.6,.6,5000)
+	fs = [func(y) for y in ys]
+	f = figure(title = 'winding number test',x_range=(-.6,.6),y_range=(-1,1))
+	f.circle(ys,fs)
+	show(f)
 	"""
 
-	r = m1/m2
-	r = (1-r/a)**.5
-	if upordown == 1:
-		r=-1*r
-	endpoint = 0
-	counter = 0
-	stepCounter =0
-	stepsize = .001
-	root = 0
-	func = rootFunction(i,m1,m2)	
-	m2Function = nIterationFunc(m2)
-	xofy = functools.partial(xsubi,i)
-	while not root or abs(root)>.5:
+	while not root or abs(root)>.5 or abs(endpoint - q)< 1e-6:
 		try:
-			root = scipy.optimize.brentq(func,r-stepsize/2,r+stepsize/2,maxiter=200,xtol=1e-14,rtol=1e-14)
+			root = scipy.optimize.brentq(func,r-stepsize/2,r+stepsize/2,maxiter=500,xtol=1e-15,rtol=1e-15)
 			print('root is',root)
 			z=[xofy(root),root]
-			Mapn(z,m2)
+			Mapn(z,p)
 			endpoint = z[0]
+			print(q != endpoint)
 			print('endpoint is',endpoint)
 		except ValueError:
 			pass
@@ -339,56 +318,114 @@ def residue(i,m1,m2,upordown):
 			stepsize=stepsize/10
 			stepCounter = 0
 			print('stepsize',stepsize)
-		if stepsize < 1e-6:
+		if stepsize < 1e-5:
 			print('No root found')
-			sys.exit()
-	print('for winding number',m1/m2)
+			break
+	print('for winding number',q,'/',p)
 	print('Final root was',root)
-	
 
-	
+	res = residue([xofy(root),root],p)
+
+	return [root,res]
+
+def residue(z,n):
 	print('Calculating the rest of the orbit for residue calculation...')
-	orbitarray = orbit(np.array([[xofy(root),root]]),m2)
+	orbitarray = orbit(np.array([z]),n)
 	print('final point on orbit was',orbitarray[0,:,-1])
 	orbitarray[0,0,:] = orbitarray[0,0,:]%1 
-	print('the last point in the res calc is',orbitarray[0,:,m2-1])
+	print('the last point in the res calc is',orbitarray[0,:,n-1])
 	tangentMatrix = np.array([[1,0],[0,1]])
-	for i in range(m2):
+	for i in range(n):
 		tangentMatrix = np.dot(tangentMap(orbitarray[0,:,i]),tangentMatrix)
 	trace = np.trace(tangentMatrix)
 	res = .25*(2-trace)
 	print('residue is:',res)
 	return res
 
+
+"""
+Bifurcation curves.
+"""
+
+def makeBifurcationCurve():
+	pass
+
+def rootFinding(i,q,p):
+	"""
+	For winding number q/p.  In p iterations this will go around the torus q times. 
+	"""
+	root =0
+	r = q/p
+	stepsize = .1
+	stepCounter = 0
+	endpoint = 0
+
+	j,n,m = totalSelectorFunction(i,q,p)
+	xofy = functools.partial(xsubi,i)
+	xofyFin = functools.partial(xsubi,j)
+
+	print('End Symmetry Line Number:', j,'\nq (numerator) is',q,'\np (denominator)',p)
+
+	def rootfunction(b):
+		setb(b)
+		z = [xofy(y),y]
+		Mapn(z,m)
+		xiPrime = z[0] - n 
+		yiPrime = z[1]
+		
+		xjPrime = xofyFin(yiPrime) 
+		return xiPrime - xjPrime
+
+	func = compose((finalFunc,rootfunction))	
+	return func
 def main():
 	args = sys.argv[1:]
 	if not args:
 		print('usage description to come later!')
 
-	if '--rftest' in args:
+	if '--test' in args:
 		output_file("test.html", title="test")
+		
+		seta(0.94)
+		global y
+		y=-.3
+		func = rootFinding(1,7,8)
 
-		i = 3
-		m1 = 46368
-		m2 = 75025
-		ud = -1
+		bs = np.linspace(0,.3,100)
+		fs = [func(b) for b in bs]
+		f = figure(title = 'winding number test',x_range=(-1,1),y_range=(0,.3))
+		f.circle(fs,bs)
+		show(f)
 	
+		sys.exit()
+	if '--manyroots' in args:
 		seta(0.686048)
 		setb(.742489259544)
-		
-		"""
-		func = rootFunction(i,m1,m2)
-		ys = np.linspace(-.6,.6,500)
-		fs = [func(y) for y in ys]
-		p = figure(title = 'winding number test',x_range=(-.6,.6),y_range=(-1,1))
-		p.circle(ys,fs)
-		show(p)
-		"""
-		residue(i,m1,m2,ud)
 
+
+		ilist = [1,3,1,3,1,3,3,1,3,1]
+		l = len(ilist)
+		qs = [1,21,3,55,8,144,1,21,8,144]
+		ps = [2,34,5,89,13,233,2,34,13,233]
+		residues = []
+		for i in range(l):
+			result = rootFinding(ilist[i],qs[i],ps[i])
+			residues.append(result[1])
+
+		for i in range(l):
+			print('Orbit from symmetry line',ilist[i],'winding number',qs[i],'/',ps[i]
+				,'had root',residues[i])
+	if '--rftest' in args:
+		output_file("test.html", title="test")
 		
-		
-		sys.exit()
+		i = 1
+		m1 = 377
+		m2 = 610
+
+		seta(0.686048)
+		setb(.742489259544)
+		rootFinding(i,m1,m2)
+
 
 	if '--windingnumbertest' in args:
 		print('Running only the test section of code!')
