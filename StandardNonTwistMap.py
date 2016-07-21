@@ -7,6 +7,7 @@ import scipy.optimize
 import functools
 from bokeh.plotting import figure, show, output_file, output_server, curdoc
 import bokeh
+from fractions import gcd
 """
 import datashader as ds
 from datashader import transfer_functions as tf
@@ -267,7 +268,7 @@ def totalSelectorFunction(i,m1,m2):
 def finalFunc(x):
 	return x/(1+abs(x))
 
-def rootFinding(i,q,p,updown='up',plot=False):
+def rootFinding(i,q,p,updown='up',plot=False,resetBounds=False,lowerBound = -1,upperBound = 1):
 	"""
 	For winding number q/p.  In p iterations this will go around the torus q times. 
 	"""
@@ -277,14 +278,7 @@ def rootFinding(i,q,p,updown='up',plot=False):
 	endpoint = 0
 	error = False
 
-	if updown == 'up':
-		r = .6
-		plusminus = -1
-	elif updown == 'down':
-		r = -.6
-		plusminus = 1
-	else:
-		print('Please specify "up" or "down" for the keyword "updown".')
+
 
 	j,n,m = totalSelectorFunction(i,q,p)
 	xofy = functools.partial(xsubi,i)
@@ -305,22 +299,58 @@ def rootFinding(i,q,p,updown='up',plot=False):
 
 	if plot:
 		title = 'root function for winding number '+str(q)+'/'+str(p)+' '+updown+' sln:'+str(i)
-		ys = np.linspace(-.6,.6,5000)
+		ys = np.linspace(lowerBound,upperBound,10000)
 		fs = [func(y) for y in ys]
-		f = figure(title = title,x_range=(-.6,.6),y_range=(-1,1))
+		f = figure(title = title,x_range=(lowerBound,upperBound),y_range=(-1,1))
 		f.circle(ys,fs)
 		show(f)
 
+	if resetBounds:
+		lowerBound = float(input('Please specify a new Lower Bound for the root search:'))
+		upperBound = float(input('Please specify a new Upper Bound for the root search:'))
+		
+	else:
+		print('Tryint to intelligently set bounds...')
+		print('first have to calculate the root function...')
+		ys = np.linspace(lowerBound,upperBound,10000)
+		fs = [func(y) for y in ys]
+		fsReverse = fs[:]
+		fsReverse.reverse()
+		threshold = .99 
+		print('done with that...  Now to find bounds...')
+		try:
+			value = next(f for f in fs if x > threshold)
+			index = fs.index(value)
+			lowerBound = ys[index]
 
-	while not root or abs(root)>.6:
+			value = next(f for f in fsReverse if x > threshold)
+			index = fs.index(value)
+			upperBound = ys[index]
+		except StopIteration:
+			threshold -= .01
+	print('Root search will now take place between',lowerBound,'and',upperBound)
+
+	if updown == 'up':
+		r = upperBound
+		plusminus = -1
+	elif updown == 'down':
+		r = lowerBound
+		plusminus = 1
+	else:
+		print('Please specify "up" or "down" for the keyword "updown".')
+
+	l = abs(upperBound-lowerBound)
+	stepsize=l/10
+
+	while not root or abs(root)>1:
 	#while not root or abs(root)>.6 or abs(endpoint - q) > 1e-6:
 		try:
-			root = scipy.optimize.brentq(func,r-stepsize/2,r+stepsize/2,maxiter=1000,xtol=1e-16)
+			root = scipy.optimize.brentq(func,r-stepsize/2,r+stepsize/2,maxiter=500,xtol=1e-16)
 			print('root is',root)
 			z=[xofy(root),root]
 			Mapn(z,p)
 			endpoint = z[0]
-			print(q != endpoint)
+			print('The r value that worked was:',r,'with stepsize:',stepsize)
 			print('endpoint is',endpoint)
 		except ValueError:
 			pass
@@ -328,17 +358,15 @@ def rootFinding(i,q,p,updown='up',plot=False):
 		stepCounter += 1
 		r=(r+plusminus*stepsize)
 
-		if r>.6001:
-			r=r-1.2
-			print('r hit .5')
-		if r<-.6001:
-			r = r+1.2
-			print('r hit -.5')
-		if stepCounter>1.2/stepsize:
+		if r>upperBound:
+			r=r-l
+		if r<lowerBound:
+			r = r+l
+		if stepCounter>l/stepsize:
 			stepsize=stepsize/10
 			stepCounter = 0
-			print('stepsize',stepsize)
-		if stepsize < 1e-5:
+			print('Went through specified range, didn\'t find a root. Moving on to stepsize:',stepsize)
+		if stepsize < l/(1e4) or stepsize < 1e-7:
 			print('No root found')
 			error = True 
 			break
@@ -370,11 +398,7 @@ def residue(z,n):
 """
 Bifurcation curves.
 """
-
-def makeBifurcationCurve():
-	pass
-
-def rootFindingBifurcations(i,q,p):
+def makeBifurcationCurve(i,q,p):
 	"""
 	For winding number q/p.  In p iterations this will go around the torus q times. 
 	"""
@@ -390,7 +414,7 @@ def rootFindingBifurcations(i,q,p):
 
 	print('Starting SLN:',i,'\nEnd Symmetry Line Number:', j,'\nq (numerator) is',q,'\np (denominator)',p)
 
-	def rootfunction(b):
+	def fofb(b):
 		setb(b)
 		z = [xofy(y),y]
 		Mapn(z,m)
@@ -400,7 +424,7 @@ def rootFindingBifurcations(i,q,p):
 		xjPrime = xofyFin(yiPrime) 
 		return xiPrime - xjPrime
 
-	func = compose((finalFunc,rootfunction))	
+	func = compose((finalFunc,fofb))	
 	return func
 
 
@@ -428,6 +452,41 @@ def main():
 	
 		sys.exit()
 
+
+	if '--density' in args:
+		"""
+		The goal
+		"""
+		def density(b):
+			n = 840
+			seta(.615)
+			setb(b)
+			rootsFound = []
+			for i in range(n-1):
+				q=i+1
+				a = gcd(q,n)
+				p = int(n/a)
+				q = int(q/a)
+				if all(rootsFound[-4:]) and len(rootsFound) > 4:
+					rootsFound.append(True)
+				else:
+					result = rootFinding(1,q,p,updown='up',lowerBound=-.2,upperBound=.2)
+					rootsFound.append(result[2])
+					result = rootFinding(1,q,p,updown='down',lowerBound=-.2,upperBound=.2)
+					rootsFound.append(result[2])
+				
+
+
+			print(rootsFound)
+			return rootsFound.count(False)
+
+		bs = np.linspace(0,1,20)
+		fs = [density(b) for b in bs]
+		f = figure(title='number density test',x_range=(0,1))
+		f.circle(bs,fs)
+		show(f)
+		sys.exit()
+		
 
 	if '--manyroots1' in args:
 		seta(0.686048)
@@ -472,9 +531,9 @@ def main():
 	if '--rftest' in args:
 		output_file("test.html", title="test")
 		
-		i = 2
-		m1 = 987
-		m2 = 1597
+		i = 3
+		m1 = 17711
+		m2 = 28657
 
 		seta(0.686048)
 		setb(.742489259544)
@@ -607,5 +666,5 @@ def main():
 	return
 
 if __name__ == '__main__':
-#	cProfile.run('main()')
-	main()
+	cProfile.run('main()')
+#	main()
