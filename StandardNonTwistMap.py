@@ -319,11 +319,10 @@ def rootFinding(i,q,p,updown='up',plot=False,resetBounds=False,lowerBound = -1,u
 		threshold = .99 
 		print('done with that...  Now to find bounds...')
 		try:
-			value = next(f for f in fs if x > threshold)
+			value = next(f for f in fs if f > threshold)
 			index = fs.index(value)
 			lowerBound = ys[index]
-
-			value = next(f for f in fsReverse if x > threshold)
+			value = next(f for f in fsReverse if f > threshold)
 			index = fs.index(value)
 			upperBound = ys[index]
 		except StopIteration:
